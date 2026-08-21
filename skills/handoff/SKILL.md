@@ -93,7 +93,7 @@ Rewrite the file with ONLY these sections (target 60–90 lines, not 200):
 - Docs-only commit already covered by a feature entry -> skip, no duplicates
 - Reading the tail: grep the entry lines, never `head` the file — it grows past a context window
 ```bash
-grep -E '^- \*\*[0-9]{4}-' CHRONICLE.md | head -30 | LC_ALL=C.UTF-8 sed -E 's/^(.{280}).*/\1 …/'
+grep -E '^- \*\*[0-9]{4}-' "$ROOT/CHRONICLE.md" | head -30 | LC_ALL=C.UTF-8 sed -E 's/^(.{280}).*/\1 …/'
 ```
 
 ## Step 7: Derived artifacts flagged by the snapshot

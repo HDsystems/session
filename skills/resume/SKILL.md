@@ -42,7 +42,7 @@ ls -d "$ROOT"/{SESSION_HANDOFF,CHRONICLE}.md "$DOCS"/{PENDING_LEDGER,PROJECT_STA
 - `CHRONICLE.md` — last 30 ENTRIES, headers only
 - `PENDING_LEDGER.md` — ALL open `- [ ]`, headers only
 ```bash
-grep -E '^- \*\*[0-9]{4}-' CHRONICLE.md | head -30 | LC_ALL=C.UTF-8 sed -E 's/^(.{280}).*/\1 …/'
+grep -E '^- \*\*[0-9]{4}-' "$ROOT/CHRONICLE.md" | head -30 | LC_ALL=C.UTF-8 sed -E 's/^(.{280}).*/\1 …/'
 grep -E '^- \[ \]' "$DOCS/PENDING_LEDGER.md" | LC_ALL=C.UTF-8 sed -E 's/^(.{220}).*/\1 …/'
 ```
 - Never `head` these two files: an entry is a paragraph, so line counts lie and the read truncates
