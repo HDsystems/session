@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # session-init.sh — create the project bookkeeping structure if it does not exist.
 #
-# Called by the /handoff, /resume, /hygiene skills when they find nowhere to write.
+# Called by the /handoff, /pickup, /hygiene skills when they find nowhere to write.
 # Idempotent: existing files are NEVER touched, only missing ones are created.
 #
 #   session-init.sh                  create what is missing
@@ -125,7 +125,7 @@ session learns about the project only from the code.
 
 ## Next session start
 
-1. Read this file. 2. \`/resume\`. 3. Estimate Effort before starting.
+1. Read this file. 2. \`/pickup\`. 3. Estimate Effort before starting.
 
 ## Key files
 
@@ -141,13 +141,13 @@ It exists because \`SESSION_HANDOFF.md\` is rewritten entirely: an item from the
 "What was NOT done" section may not survive the next handoff generation. This file is not
 rewritten, so an item physically cannot be lost here.
 
-## Contract (obeyed by \`/handoff\` and \`/resume\`)
+## Contract (obeyed by \`/handoff\` and \`/pickup\`)
 
 - **Append + single-line edits only.** The file is never rewritten as a whole.
 - \`/handoff\` at the end of a session: each "What was NOT done" item not already open is
   appended as \`- [ ]\` under today's date. Nothing is deleted.
 - Closing an item — mark the line \`[x]\` and the close date. One-line edit, not a bulk one.
-- \`/resume\` at the start of a session reads ALL open \`[ ]\` — that is the priority tail.
+- \`/pickup\` at the start of a session reads ALL open \`[ ]\` — that is the priority tail.
 - Long-lived item (2+ sessions) -> a card in \`BACKLOG.md\`; the line here closes with a reference.
 
 ---

@@ -32,7 +32,7 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-SKILLS="handoff resume hygiene"
+SKILLS="handoff pickup hygiene"
 SCRIPTS="session-init.sh session-facts.sh"
 DONE=0
 SKIPPED=0
@@ -87,7 +87,7 @@ else
     echo "install: connected $DONE, skipped $SKIPPED."
     if [ "$DRY_RUN" = 0 ] && [ "$DONE" -gt 0 ]; then
         echo "  The skill list is read at startup — restart Claude Code."
-        echo "  Check: /resume in any git repository."
+        echo "  Check: /pickup in any git repository."
     fi
 fi
 exit 0

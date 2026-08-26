@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # session-facts.sh — a universal minimum of facts about a project.
 #
-# Called by the /handoff and /resume skills when the project has NO
+# Called by the /handoff and /pickup skills when the project has NO
 # scripts/session-snapshot.sh of its own. It lives next to the skills, not in the
 # project, and that is deliberate: the skills treat a project snapshot as the source
 # of truth and do not re-check by hand what it printed. This script does not earn that
@@ -75,7 +75,7 @@ if [ -e "$ROOT/CHRONICLE.md" ]; then
     ENTRIES=$(grep -cE '^- \*\*[0-9]{4}-' "$ROOT/CHRONICLE.md" || true)
     echo "CHRON  entries in canonical format: $ENTRIES"
     # Zero entries in a non-empty file is the silent breakage: /handoff will prepend a
-    # canonical line, /resume will read only it and silently skip the whole history.
+    # canonical line, /pickup will read only it and silently skip the whole history.
     if [ "$ENTRIES" = 0 ] && [ -s "$ROOT/CHRONICLE.md" ]; then
         echo "       ⚠ file is non-empty but has no canonical-format entries —"
         echo "         do not append until the format matches the contract"

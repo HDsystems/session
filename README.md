@@ -40,7 +40,7 @@ exists precisely so that does not happen.
 
 | Command | When | What it does |
 |---|---|---|
-| `/resume` | start of a session | reads all of the above and produces 5–10 lines: where you left off, what is pending, what not to touch, the first step |
+| `/pickup` | start of a session | reads all of the above and produces 5–10 lines: where you left off, what is pending, what not to touch, the first step |
 | `/handoff` | end of a session, before `/clear` | rewrites the handoff, appends the chronicle, syncs the ledger, commits |
 | `/hygiene` | weekly | audits backlog-card drift, syncs docs with commits, prunes the ledger, reclaims disk |
 
@@ -92,7 +92,7 @@ knows one `git` command would inherit that status over facts it does not collect
 states honestly at the end of its output what it does not know.
 
 Separately, the script warns if `CHRONICLE.md` is non-empty but has no canonical-format
-entries. That is a silent breakage: `/handoff` would prepend a canonical line, `/resume`
+entries. That is a silent breakage: `/handoff` would prepend a canonical line, `/pickup`
 would read only it and silently skip the whole history.
 
 ## Install
@@ -136,12 +136,12 @@ Five rules, and the first two are the ones that bite:
   # ... your project-specific facts below
   ```
 - **Fail soft, always exit 0.** The skills treat your output as the source of truth and do not
-  re-check it. A snapshot that dies on a missing tool or an offline network takes `/resume`
+  re-check it. A snapshot that dies on a missing tool or an offline network takes `/pickup`
   down with it; one that silently omits a section misleads instead. Guard external calls
   (`timeout`, `|| true`, `command -v`) and print what you could not determine, e.g.
   `PR #123: unreachable (offline) — check by hand`.
 - **A `⚠` marks what needs attention.** It is the one output convention the skills act on:
-  `/resume` lifts flagged lines into its Health section and re-verifies those items, and only
+  `/pickup` lifts flagged lines into its Health section and re-verifies those items, and only
   those. Flag what changes what the operator would do next; leave routine green state unmarked
   or the signal is worthless.
 - **Free format otherwise.** An agent reads the output, not a parser. Short labelled lines

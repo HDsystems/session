@@ -1,9 +1,9 @@
 ---
-name: resume
+name: pickup
 description: Reorient at the start of a fresh session — reads SESSION_HANDOFF, PROJECT_STATE invariants, the CHRONICLE tail and open PENDING_LEDGER items, and surfaces where you left off / what is live / pending / do-not-touch / first step in 5-10 lines. Works in any git repository: paths resolve from the repo root, and optional pieces (snapshot script, ledger, project state) activate only when present. Live facts come from the project's snapshot script when it has one, never hand-gathered. Use after /clear or at the start of any session in a project that keeps a handoff. Missing structure -> `~/.claude/bin/session-init.sh`.
 ---
 
-# Resume — 30-second reorientation
+# Pickup — 30-second reorientation
 
 ## Goal
 - Operator learns where you left off / what is live / what is pending / what not to touch / first step
