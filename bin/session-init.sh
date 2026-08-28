@@ -8,6 +8,7 @@
 #   session-init.sh --dry-run        show the plan, write nothing
 #   session-init.sh --minimal        only SESSION_HANDOFF.md and CHRONICLE.md
 #   session-init.sh --with-backlog   plus BACKLOG.md and a card directory
+#   session-init.sh --with-sweep     plus SWEEP_MAP.md, the /sweep coverage map
 #   session-init.sh --root DIR       explicit root instead of the git root
 #
 # Layout (search order is fixed, not guessed):
@@ -19,16 +20,24 @@
 #     project may have hundreds). It pays off when an item lives across many sessions and
 #     grows a history of its own; a short tail is covered by PENDING_LEDGER. Pass
 #     --with-backlog when you want it.
+#   SWEEP_MAP.md — the coverage map /sweep keeps: which area was swept, at which commit, with
+#     what verdict, and which findings the operator ruled exempt. It pays off on a codebase too
+#     large to sweep in one sitting, where the alternative is re-proposing every time the same
+#     false positives that were already refused. A project that cleans up in a single pass has
+#     nothing to remember between passes. Pass --with-sweep when you want it; the map is created
+#     with its contract and NO rows, because a row means an area was actually swept.
 #   scripts/session-snapshot.sh — the live-facts collector, project-specific by nature (for a
 #     containerized project it is services, health, disk). The skills treat it as the SOURCE
 #     OF TRUTH and do not re-check by hand what it printed. A stub that knows only git would
 #     inherit that status over facts it does not collect. Write it per project by hand; until
-#     it exists, the skills gather the minimum themselves.
+#     it exists, the skills gather the minimum themselves. scripts/sweep-tools.sh, which tells
+#     /sweep how THIS project detects dead code, is project-owned for the same reason.
 set -euo pipefail
 
 DRY_RUN=0
 MINIMAL=0
 WITH_BACKLOG=0
+WITH_SWEEP=0
 ROOT=""
 
 while [ $# -gt 0 ]; do
@@ -36,8 +45,12 @@ while [ $# -gt 0 ]; do
         --dry-run) DRY_RUN=1 ;;
         --minimal) MINIMAL=1 ;;
         --with-backlog) WITH_BACKLOG=1 ;;
-        --root)    ROOT="${2:-}"; shift ;;
-        -h|--help) sed -n '2,30p' "$0"; exit 0 ;;
+        --with-sweep) WITH_SWEEP=1 ;;
+        --root)
+            ROOT="${2:-}"
+            [ -n "$ROOT" ] || { echo "--root needs a directory" >&2; exit 2; }
+            shift ;;
+        -h|--help) sed -n '2,34p' "$0"; exit 0 ;;
         *) echo "unknown argument: $1" >&2; exit 2 ;;
     esac
     shift
@@ -201,6 +214,38 @@ EOF
     else
         plan "exists" "$DOCS/BACKLOG/"
     fi
+fi
+
+if [ "$WITH_SWEEP" = 1 ]; then
+    create "$DOCS/SWEEP_MAP.md" <<EOF
+# SWEEP MAP — code-cleanup coverage by area
+
+Which area \`/sweep\` last went through, at which commit, and what came of it. It exists because
+a codebase worth sweeping is bigger than one pass: without this file every sweep starts from
+zero and re-proposes the findings the operator already refused.
+
+Staleness is counted in COMMITS, not in days. An area nobody has edited since its last sweep
+does not need another one, however long ago that was, and a date-based rule would send the
+operator back into untouched code every month. \`sweep-map.sh\` reads this table and reports
+which areas actually moved.
+
+## Contract (obeyed by \`/sweep\`)
+
+- **Single-row edits only.** The file is never rewritten as a whole.
+- One row per area, added only after a REAL sweep. An area never swept has no row.
+- \`Swept at\` is the commit SHA the area was swept at; \`Date\` is for the human reading the table.
+  The SHA is what staleness is measured from — do not replace it with a date.
+- \`Verdict\` ∈ \`clean | removed <what> | partial — see PENDING_LEDGER | observation only\`.
+  One vocabulary, so a later reader can scan the column instead of parsing sentences.
+- \`Exempt\` records an operator decision to STOP re-proposing a known false positive, WITH its
+  reason, e.g. \`permanent — reached by name through the adapter registry\`. An exempt area is
+  reported as exempt and left out of the stale list.
+- An area left unfinished -> an item in \`PENDING_LEDGER.md\`; anything removed -> an entry in
+  \`CHRONICLE.md\`.
+
+| Area | Swept at | Date | Verdict | Exempt |
+|---|---|---|---|---|
+EOF
 fi
 
 echo

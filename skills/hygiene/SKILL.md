@@ -96,4 +96,5 @@ docs: hygiene — <what was audited: cards / docs / prune result>
 - Do NOT bulk-rewrite `PENDING_LEDGER` — only its prune script
 - Do NOT clean disk by hand — only the project's prune script, except the `sudo` lines it printed
 - Do NOT duplicate `/handoff` work (lede / what-shipped / ledger append / CHRONICLE) — that is its zone
+- Do NOT touch CODE (dead code, duplication, stale tests) — that is `/sweep`'s zone, and it is gated for a reason
 - Do NOT edit `CLAUDE.md`

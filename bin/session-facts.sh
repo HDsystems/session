@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # session-facts.sh — a universal minimum of facts about a project.
 #
-# Called by the /handoff and /pickup skills when the project has NO
+# Called by the /handoff, /pickup, /hygiene and /sweep skills when the project has NO
 # scripts/session-snapshot.sh of its own. It lives next to the skills, not in the
 # project, and that is deliberate: the skills treat a project snapshot as the source
 # of truth and do not re-check by hand what it printed. This script does not earn that
@@ -12,8 +12,8 @@
 #   session-facts.sh --paths      resolved layout as shell assignments, nothing else
 #   session-facts.sh --root DIR   explicit root instead of the git root
 #
-# --paths is the single source of truth for layout resolution: the three skills eval it
-# in their Step 0 instead of each re-deriving the same paths. It is read-only, exits 0
+# --paths is the single source of truth for layout resolution: the skills eval it in their
+# Step 0 instead of each re-deriving the same paths. It is read-only, exits 0
 # even when every optional file is missing (absence is the normal case, not a failure),
 # and on a hard error prints an evaluable SESSION_FACTS_ERROR instead of nothing.
 set -euo pipefail
@@ -24,7 +24,10 @@ PATHS_ONLY=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --paths) PATHS_ONLY=1 ;;
-        --root) ROOT="${2:-}"; shift ;;
+        --root)
+            ROOT="${2:-}"
+            [ -n "$ROOT" ] || { echo "--root needs a directory" >&2; exit 2; }
+            shift ;;
         -h|--help) sed -n '2,18p' "$0"; exit 0 ;;
         *) echo "unknown argument: $1" >&2; exit 2 ;;
     esac
@@ -89,6 +92,12 @@ if [ ! -x "$SCRIPTS/session-snapshot.sh" ] && [ "$BOOKS" != "$ROOT" ]; then
     if [ -x "$ALT/session-snapshot.sh" ]; then SCRIPTS="$ALT"; fi
 fi
 
+# The two /sweep files split along the same line as everything above: the coverage map is
+# bookkeeping, written by a skill, so it follows BOOKS via DOCS; the detector script is the
+# project's own code like session-snapshot.sh, so it travels with the checkout via SCRIPTS.
+SWEEPMAP="$DOCS/SWEEP_MAP.md"
+SWEEPTOOLS="$SCRIPTS/sweep-tools.sh"
+
 # Reading from the main worktree is always safe. WRITING is not: if the books are tracked
 # there, writing dirties a checkout that may be mid-work on another branch. Untracked ->
 # writing changes nothing git can see, and there is nothing to commit. Every file a skill may
@@ -98,7 +107,8 @@ fi
 if [ "$BOOKS_SOURCE" = main-worktree ]; then
     BOOKS_WRITE=fallback-untracked
     for f in "$BOOKS/SESSION_HANDOFF.md" "$BOOKS/CHRONICLE.md" \
-             "$DOCS/PENDING_LEDGER.md" "$DOCS/PROJECT_STATE.md" "$DOCS/BACKLOG.md"; do
+             "$DOCS/PENDING_LEDGER.md" "$DOCS/PROJECT_STATE.md" "$DOCS/BACKLOG.md" \
+             "$SWEEPMAP"; do
         if git -C "$MAIN" ls-files --error-unmatch "$f" >/dev/null 2>&1; then
             BOOKS_WRITE=fallback-tracked
             break
@@ -112,22 +122,28 @@ HAVE_CHRONICLE=$(have "$BOOKS/CHRONICLE.md")
 HAVE_LEDGER=$(have "$DOCS/PENDING_LEDGER.md")
 HAVE_STATE=$(have "$DOCS/PROJECT_STATE.md")
 HAVE_BACKLOG=$(have "$DOCS/BACKLOG.md")
+HAVE_SWEEPMAP=$(have "$SWEEPMAP")
 HAVE_SNAPSHOT=$(have "$SCRIPTS/session-snapshot.sh")
+HAVE_SWEEPTOOLS=$(have "$SWEEPTOOLS")
 
 if [ "$PATHS_ONLY" = 1 ]; then
-    printf 'ROOT=%q\n'           "$ROOT"
-    printf 'MAIN=%q\n'           "$MAIN"
-    printf 'BOOKS=%q\n'          "$BOOKS"
-    printf 'DOCS=%q\n'           "$DOCS"
-    printf 'SCRIPTS=%q\n'        "$SCRIPTS"
-    printf 'BOOKS_SOURCE=%q\n'   "$BOOKS_SOURCE"
-    printf 'BOOKS_WRITE=%q\n'    "$BOOKS_WRITE"
-    printf 'HAVE_HANDOFF=%q\n'   "$HAVE_HANDOFF"
-    printf 'HAVE_CHRONICLE=%q\n' "$HAVE_CHRONICLE"
-    printf 'HAVE_LEDGER=%q\n'    "$HAVE_LEDGER"
-    printf 'HAVE_STATE=%q\n'     "$HAVE_STATE"
-    printf 'HAVE_BACKLOG=%q\n'   "$HAVE_BACKLOG"
-    printf 'HAVE_SNAPSHOT=%q\n'  "$HAVE_SNAPSHOT"
+    printf 'ROOT=%q\n'            "$ROOT"
+    printf 'MAIN=%q\n'            "$MAIN"
+    printf 'BOOKS=%q\n'           "$BOOKS"
+    printf 'DOCS=%q\n'            "$DOCS"
+    printf 'SCRIPTS=%q\n'         "$SCRIPTS"
+    printf 'SWEEPMAP=%q\n'        "$SWEEPMAP"
+    printf 'SWEEPTOOLS=%q\n'      "$SWEEPTOOLS"
+    printf 'BOOKS_SOURCE=%q\n'    "$BOOKS_SOURCE"
+    printf 'BOOKS_WRITE=%q\n'     "$BOOKS_WRITE"
+    printf 'HAVE_HANDOFF=%q\n'    "$HAVE_HANDOFF"
+    printf 'HAVE_CHRONICLE=%q\n'  "$HAVE_CHRONICLE"
+    printf 'HAVE_LEDGER=%q\n'     "$HAVE_LEDGER"
+    printf 'HAVE_STATE=%q\n'      "$HAVE_STATE"
+    printf 'HAVE_BACKLOG=%q\n'    "$HAVE_BACKLOG"
+    printf 'HAVE_SWEEPMAP=%q\n'   "$HAVE_SWEEPMAP"
+    printf 'HAVE_SNAPSHOT=%q\n'   "$HAVE_SNAPSHOT"
+    printf 'HAVE_SWEEPTOOLS=%q\n' "$HAVE_SWEEPTOOLS"
     exit 0
 fi
 
@@ -169,7 +185,8 @@ printf '       %-4s %s\n' \
     "$HAVE_CHRONICLE" "CHRONICLE.md" \
     "$HAVE_LEDGER"    "${DOCS#"$BOOKS"/}/PENDING_LEDGER.md" \
     "$HAVE_STATE"     "${DOCS#"$BOOKS"/}/PROJECT_STATE.md" \
-    "$HAVE_BACKLOG"   "${DOCS#"$BOOKS"/}/BACKLOG.md"
+    "$HAVE_BACKLOG"   "${DOCS#"$BOOKS"/}/BACKLOG.md" \
+    "$HAVE_SWEEPMAP"  "${DOCS#"$BOOKS"/}/SWEEP_MAP.md"
 if [ "$BOOKS_SOURCE" = main-worktree ]; then
     echo "       ⚠ the bookkeeping is NOT in this worktree — it lives in the main one."
     if [ "$BOOKS_WRITE" = fallback-tracked ]; then
@@ -179,6 +196,11 @@ if [ "$BOOKS_SOURCE" = main-worktree ]; then
         echo "         Untracked there, so writing is safe and commits nothing."
     fi
 fi
+
+# Reported on its own line, not among the books: it is project code and can sit outside BOOKS
+# entirely, so it is shown against the worktree it actually belongs to.
+SWEEPREL=${SWEEPTOOLS#"$ROOT"/}; SWEEPREL=${SWEEPREL#"$MAIN"/}
+printf 'SWEEP  %-4s %s\n' "$HAVE_SWEEPTOOLS" "$SWEEPREL"
 
 if [ "$HAVE_LEDGER" = yes ]; then
     OPEN=$(grep -cE '^- \[ \]' "$DOCS/PENDING_LEDGER.md" || true)
