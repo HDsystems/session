@@ -239,8 +239,10 @@ if [ "$MODE" = areas ]; then
         MK=$(printf '%s\n' "$ROWS" | awk -F'\t' -v d="$area" '$1 == d { printf "%s%s", sep, $2; sep = "," } END { print "" }')
         [ -n "$MK" ] || MK="-"
         TAG=""
-        if is_generated "$area"; then TAG="  auto-exempt (generated)"
-        elif is_bookkeeping "$area"; then TAG="  bookkeeping — /hygiene, not /sweep"
+        # Bookkeeping is checked FIRST: a project that ignores its own docs/ would otherwise
+        # be told the coverage map is a generated tree, which is true but useless.
+        if is_bookkeeping "$area"; then TAG="  bookkeeping — /hygiene, not /sweep"
+        elif is_generated "$area"; then TAG="  auto-exempt (generated)"
         elif printf '%s\n' "$MAPPED" | grep -qxF "$area"; then TAG="  (in map)"
         fi
         printf "       %-${WIDTH}s %-16s %s%s\n" "$area" "$MK" "$(area_exts "$area")" "$TAG"

@@ -1,0 +1,16 @@
+# This repository's OWN bookkeeping — the very files the skills here create.
+#
+# They are working notes belonging to whoever maintains this toolkit: which clone is which,
+# what the last session changed, what is still open. A clone should get the skills, not one
+# maintainer's session log, so they are deliberately never published.
+#
+# IN YOUR PROJECT THESE FILES ARE THE POINT AND BELONG IN GIT. Do not copy this rule across —
+# the whole argument of the README is that this state must outlive a context window, and a
+# project that ignores them has bookkeeping only until the next machine.
+#
+# Kept here rather than in .git/info/exclude, which was the earlier choice: exclude is not
+# cloned and not backed up, so the protection existed on exactly one machine and a fresh
+# clone plus `git add -A` would publish everything.
+SESSION_HANDOFF.md
+CHRONICLE.md
+docs/
