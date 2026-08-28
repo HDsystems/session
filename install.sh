@@ -32,8 +32,25 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-SKILLS="handoff pickup hygiene"
-SCRIPTS="session-init.sh session-facts.sh"
+# Both lists ARE the clone's contents, never a copy of them: a skill is a directory under
+# skills/ holding a SKILL.md, a script is an executable file under bin/. Hardcoding the names
+# means the next skill added to this repo is silently not linked, and nothing reports it.
+# Plain globs, not `find -printf`: the latter is a GNU extension and this runs on macOS too.
+SKILLS=()
+for d in "$SRC"/skills/*/; do
+    [ -f "$d/SKILL.md" ] || continue
+    SKILLS+=("$(basename "$d")")
+done
+SCRIPTS=()
+for f in "$SRC"/bin/*; do
+    [ -f "$f" ] && [ -x "$f" ] || continue
+    SCRIPTS+=("$(basename "$f")")
+done
+if [ ${#SKILLS[@]} -eq 0 ] && [ ${#SCRIPTS[@]} -eq 0 ]; then
+    echo "install: nothing to install — no skills/*/SKILL.md and no executables in bin/." >&2
+    echo "  Is $SRC a complete clone?" >&2
+    exit 1
+fi
 DONE=0
 SKIPPED=0
 
@@ -75,10 +92,11 @@ link_one() {
 }
 
 echo "install: $SRC -> $DEST  (mode: $MODE)"
+echo "  found ${#SKILLS[@]} skill(s), ${#SCRIPTS[@]} script(s) in the clone"
 [ "$DRY_RUN" = 1 ] && echo "  (dry-run: nothing changes)"
 
-for s in $SKILLS;  do link_one "$SRC/skills/$s" "$DEST/skills/$s"; done
-for f in $SCRIPTS; do link_one "$SRC/bin/$f"    "$DEST/bin/$f";    done
+for s in ${SKILLS[@]+"${SKILLS[@]}"};  do link_one "$SRC/skills/$s" "$DEST/skills/$s"; done
+for f in ${SCRIPTS[@]+"${SCRIPTS[@]}"}; do link_one "$SRC/bin/$f"     "$DEST/bin/$f";    done
 
 echo
 if [ "$MODE" = uninstall ]; then
