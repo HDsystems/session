@@ -65,7 +65,7 @@ if [ -n "$MAIN" ] && [ -d "$MAIN" ]; then MAIN=$(readlink -f "$MAIN"); else MAIN
 
 # --- where the bookkeeping actually lives -----------------------------------
 # A linked worktree checks out tracked files only. Bookkeeping that is tracked travels
-# with it and nothing special happens. Bookkeeping that is local (git/info/exclude, the
+# with it and nothing special happens. Bookkeeping kept out of git (ignored or excluded, the
 # usual choice for maintainer notes) exists ONLY in the main worktree — and a skill that
 # resolved against the worktree root would report "this project keeps no handoff" and
 # offer to create a second, competing set of files.

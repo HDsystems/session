@@ -27,7 +27,8 @@ state=$HAVE_STATE backlog=$HAVE_BACKLOG snapshot=$HAVE_SNAPSHOT"
   `SESSION_SCRIPTS_DIR`, symlink resolution and the worktree rule live there, not here
 - Bookkeeping lives under `$BOOKS`, NOT `$ROOT` — in a linked worktree the two differ, and
   `$DOCS` is already resolved against `$BOOKS`. A worktree checks out TRACKED files only, so
-  books kept local (`.git/info/exclude`) exist in the main worktree alone
+  books kept OUT of git — ignored or excluded, the usual choice for maintainer notes —
+  exist in the main worktree alone
 - `BOOKS_WRITE` is the ONLY gate on writing, and it is decided here, once:
   - `direct` — books are in this worktree; proceed normally
   - `fallback-untracked` — books are in `$MAIN` and untracked there: write them, say in one
@@ -128,8 +129,10 @@ Prepared for /clear — the next session starts from this handoff.
 ```
 - Trailers (`Co-Authored-By`, `Claude-Session`) come from the current session prompt — never hardcode here
 - `git status --short` -> confirm clean-in-scope
-- `BOOKS_WRITE=fallback-untracked` -> the books are untracked in `$MAIN` and nothing here is
-  stageable: skip the commit, report where they were written instead of an empty commit
+- NOTHING staged after that -> do NOT commit, and do NOT reach for `git add -f`. Books can be
+  unstageable for good reasons: a repo that deliberately keeps its own notes out of itself,
+  or `fallback-untracked` books living in `$MAIN`. Report where they were written and stop —
+  an empty commit records nothing, and forcing the add publishes what someone excluded
 - Skip auto-commit and ask (A commit / B leave / C revert) ONLY on: a secret/PII in the diff, foreign dirty files, or operator typed `dry-run`
 
 ## Bootstrap — project has no bookkeeping yet

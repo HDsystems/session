@@ -70,7 +70,7 @@ with paths beyond a symlink — `fatal: pathspec ... is beyond a symbolic link` 
 the bookkeeping files would fail.
 
 **In a linked worktree the root is not enough.** A worktree checks out *tracked* files only,
-so bookkeeping kept local — `.git/info/exclude`, the usual choice for maintainer notes —
+so bookkeeping kept out of git — ignored or excluded, the usual choice for maintainer notes —
 exists in the main worktree alone. Resolving against the worktree root would report "this
 project keeps no handoff" and offer to create a second, competing set of files. So when the
 worktree has no `SESSION_HANDOFF.md` and no `CHRONICLE.md` but the main worktree does, the

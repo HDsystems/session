@@ -25,7 +25,8 @@ state=$HAVE_STATE backlog=$HAVE_BACKLOG snapshot=$HAVE_SNAPSHOT"
   `SESSION_SCRIPTS_DIR`, symlink resolution and the worktree rule live there, not here
 - Bookkeeping lives under `$BOOKS`, NOT `$ROOT` — in a linked worktree the two differ, and
   `$DOCS` is already resolved against `$BOOKS`. A worktree checks out TRACKED files only, so
-  books kept local (`.git/info/exclude`) exist in the main worktree alone
+  books kept OUT of git — ignored or excluded, the usual choice for maintainer notes —
+  exist in the main worktree alone
 - `BOOKS_SOURCE=main-worktree` -> you are in a worktree and the books live in `$MAIN`; say so
   in one line, so the operator knows which files were read
 - `HAVE_HANDOFF=no` AND `HAVE_CHRONICLE=no` -> project keeps no handoff: say so, run
