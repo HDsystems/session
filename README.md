@@ -67,6 +67,19 @@ A symlinked directory is resolved to its real path. This is not pedantry: git re
 with paths beyond a symlink — `fatal: pathspec ... is beyond a symbolic link` — and committing
 the bookkeeping files would fail.
 
+**In a linked worktree the root is not enough.** A worktree checks out *tracked* files only,
+so bookkeeping kept local — `.git/info/exclude`, the usual choice for maintainer notes —
+exists in the main worktree alone. Resolving against the worktree root would report "this
+project keeps no handoff" and offer to create a second, competing set of files. So when the
+worktree has no `SESSION_HANDOFF.md` and no `CHRONICLE.md` but the main worktree does, the
+books resolve there (`git worktree list` prints the main worktree first, whatever the `.git`
+layout is). Reading from there is always safe; writing is gated:
+
+| The books in the main worktree are | `/handoff` and `/hygiene` |
+|---|---|
+| untracked | write, and say where. Nothing is stageable, so no commit |
+| tracked | stop and ask — writing dirties a checkout that may be mid-work on another branch |
+
 Everything except the first two files is **optional**. No ledger — the step is skipped with a
 line of output, not a failure.
 
@@ -85,6 +98,21 @@ session-init.sh --with-backlog   # plus BACKLOG.md and a card directory
 **`bin/session-facts.sh`** — the minimum facts about a repository: branch, HEAD, upstream
 sync, changed files, recent commits, which bookkeeping files exist, ledger and chronicle
 counts. Called by the skills when a project has no `scripts/session-snapshot.sh` of its own.
+
+It has a second job. `--paths` prints the resolved layout as shell assignments and nothing
+else, and the three skills `eval` it in their Step 0 instead of each re-deriving the same
+paths:
+
+```bash
+eval "$(~/.claude/bin/session-facts.sh --paths)"
+# ROOT MAIN BOOKS DOCS SCRIPTS BOOKS_SOURCE BOOKS_WRITE HAVE_HANDOFF HAVE_CHRONICLE …
+```
+
+Search order, `SESSION_DOCS_DIR` / `SESSION_SCRIPTS_DIR`, symlink resolution and the worktree
+rule above therefore live in one place. It is read-only and **exits 0 even when every optional
+file is missing** — absence is the normal case, and a probe that treats it as failure (`ls`
+exits 2 on the first missing path) reports a healthy project as a broken one. A hard error
+prints an evaluable `SESSION_FACTS_ERROR` instead of leaving the caller with empty output.
 
 It lives next to the skills, not in the project — deliberately. The skills treat a project
 snapshot as the source of truth and do not re-check by hand what it printed; a stub that

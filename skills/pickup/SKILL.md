@@ -1,6 +1,6 @@
 ---
 name: pickup
-description: Reorient at the start of a fresh session — reads SESSION_HANDOFF, PROJECT_STATE invariants, the CHRONICLE tail and open PENDING_LEDGER items, and surfaces where you left off / what is live / pending / do-not-touch / first step in 5-10 lines. Works in any git repository: paths resolve from the repo root, and optional pieces (snapshot script, ledger, project state) activate only when present. Live facts come from the project's snapshot script when it has one, never hand-gathered. Use after /clear or at the start of any session in a project that keeps a handoff. Missing structure -> `~/.claude/bin/session-init.sh`.
+description: Reorient at the start of a fresh session — reads SESSION_HANDOFF, PROJECT_STATE invariants, the CHRONICLE tail and open PENDING_LEDGER items, and surfaces where you left off / what is live / pending / do-not-touch / first step in 5-10 lines. Works in any git repository and in a linked worktree: paths resolve through `session-facts.sh --paths`, which finds the books in the main worktree when the worktree has none, and optional pieces (snapshot script, ledger, project state) activate only when present. Live facts come from the project's snapshot script when it has one, never hand-gathered. Use after /clear or at the start of any session in a project that keeps a handoff. Missing structure -> `~/.claude/bin/session-init.sh`.
 ---
 
 # Pickup — 30-second reorientation
@@ -11,20 +11,26 @@ description: Reorient at the start of a fresh session — reads SESSION_HANDOFF,
 
 ## Step 0: Resolve project
 ```bash
-ROOT=$(git rev-parse --show-toplevel) || { echo "not a git repo"; exit 1; }
-# readlink -f, not echo: the dir may be a symlink, and git refuses paths that live
-# beyond one ("beyond a symbolic link"). SESSION_DOCS_DIR / SESSION_SCRIPTS_DIR name a
-# nested layout (e.g. "sub/docs") when a project keeps one; unset = plain docs/, scripts/.
-pick() { for d in "$@"; do [ -d "$d" ] && { readlink -f "$d"; return 0; }; done; echo "$1"; }
-DOCS=$(pick "$ROOT/docs" ${SESSION_DOCS_DIR:+"$ROOT/$SESSION_DOCS_DIR"})
-SCRIPTS=$(pick "$ROOT/scripts" ${SESSION_SCRIPTS_DIR:+"$ROOT/$SESSION_SCRIPTS_DIR"})
-ls -d "$ROOT"/{SESSION_HANDOFF,CHRONICLE}.md "$DOCS"/{PENDING_LEDGER,PROJECT_STATE}.md \
-      "$SCRIPTS"/session-snapshot.sh 2>/dev/null
+FACTS="${CLAUDE_HOME:-$HOME/.claude}/bin/session-facts.sh"
+eval "$("$FACTS" --paths)"   # ROOT MAIN BOOKS DOCS SCRIPTS BOOKS_SOURCE BOOKS_WRITE HAVE_*
+[ -n "${ROOT:-}" ] || { echo "layout unresolved: ${SESSION_FACTS_ERROR:-$FACTS missing — reinstall}"; exit 1; }
+echo "BOOKS $BOOKS ($BOOKS_SOURCE, write:$BOOKS_WRITE)"
+echo "handoff=$HAVE_HANDOFF chronicle=$HAVE_CHRONICLE ledger=$HAVE_LEDGER \
+state=$HAVE_STATE backlog=$HAVE_BACKLOG snapshot=$HAVE_SNAPSHOT"
 ```
-- Search order is fixed, not guessed: plain layout first, the configured nested layout second
-- No `SESSION_HANDOFF.md` and no `CHRONICLE.md` -> project keeps no handoff: say so, run
+- ONE call and it EXITS 0 even when every optional file is missing: absence is the normal,
+  documented case, never a failure. Do NOT probe with `ls` — it exits 2 on the first missing
+  path, which turns a healthy project into "failed to resolve the layout"
+- `--paths` is the single source of truth for the layout: search order, `SESSION_DOCS_DIR` /
+  `SESSION_SCRIPTS_DIR`, symlink resolution and the worktree rule live there, not here
+- Bookkeeping lives under `$BOOKS`, NOT `$ROOT` — in a linked worktree the two differ, and
+  `$DOCS` is already resolved against `$BOOKS`. A worktree checks out TRACKED files only, so
+  books kept local (`.git/info/exclude`) exist in the main worktree alone
+- `BOOKS_SOURCE=main-worktree` -> you are in a worktree and the books live in `$MAIN`; say so
+  in one line, so the operator knows which files were read
+- `HAVE_HANDOFF=no` AND `HAVE_CHRONICLE=no` -> project keeps no handoff: say so, run
   `~/.claude/bin/session-init.sh --dry-run`, offer it, then orient from `git log` and `README`
-- Every other file is OPTIONAL: absent -> its line is omitted, not faked
+- Every other file is OPTIONAL: `no` -> its line is omitted, not faked
 
 ## Step 1: Facts, one call
 - `$SCRIPTS/session-snapshot.sh` exists -> run it; it is the SSOT of live facts, and you do
@@ -37,12 +43,14 @@ ls -d "$ROOT"/{SESSION_HANDOFF,CHRONICLE}.md "$DOCS"/{PENDING_LEDGER,PROJECT_STA
   contract" in this repo's README (it replaces the fallback, fails soft, flags with `⚠`)
 
 ## Step 2: Read context (parallel, slim)
-- `SESSION_HANDOFF.md` — in full; it is already slim
-- `PROJECT_STATE.md` — in full; invariants, do-not-touch, environment quirks
-- `CHRONICLE.md` — last 30 ENTRIES, headers only
-- `PENDING_LEDGER.md` — ALL open `- [ ]`, headers only
+- `$BOOKS/SESSION_HANDOFF.md` — in full; it is already slim
+- `$DOCS/PROJECT_STATE.md` — in full; invariants, do-not-touch, environment quirks
+- `$BOOKS/CHRONICLE.md` — last 30 ENTRIES, headers only
+- `$DOCS/PENDING_LEDGER.md` — ALL open `- [ ]`, headers only
+- Read them by their RESOLVED path: `$BOOKS`/`$DOCS`, never a bare relative name — invoked
+  from a subdirectory or a worktree the bare name silently matches nothing
 ```bash
-grep -E '^- \*\*[0-9]{4}-' "$ROOT/CHRONICLE.md" | head -30 | LC_ALL=C.UTF-8 sed -E 's/^(.{280}).*/\1 …/'
+grep -E '^- \*\*[0-9]{4}-' "$BOOKS/CHRONICLE.md" | head -30 | LC_ALL=C.UTF-8 sed -E 's/^(.{280}).*/\1 …/'
 grep -E '^- \[ \]' "$DOCS/PENDING_LEDGER.md" | LC_ALL=C.UTF-8 sed -E 's/^(.{220}).*/\1 …/'
 ```
 - Never `head` these two files: an entry is a paragraph, so line counts lie and the read truncates

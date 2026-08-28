@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: Prepare a fresh session to resume — writes a SLIM SESSION_HANDOFF.md (lede + what-was-done + next-actions only), appends CHRONICLE entries for shipped changes, syncs the append-only PENDING_LEDGER, and commits. Works in any git repository: paths resolve from the repo root, optional pieces (snapshot script, ledger, project state, derived-artifact drift) activate only when present. Facts come from the snapshot script when the project has one. Stable invariants live in PROJECT_STATE.md (referenced, never rewritten). Heavy hygiene is the separate /hygiene skill. Use at end of any non-trivial session before /clear. Missing structure -> `~/.claude/bin/session-init.sh`.
+description: Prepare a fresh session to resume — writes a SLIM SESSION_HANDOFF.md (lede + what-was-done + next-actions only), appends CHRONICLE entries for shipped changes, syncs the append-only PENDING_LEDGER, and commits. Works in any git repository and in a linked worktree: paths resolve through `session-facts.sh --paths`, which also decides whether writing to the main worktree is safe, and optional pieces (snapshot script, ledger, project state, derived-artifact drift) activate only when present. Facts come from the snapshot script when the project has one. Stable invariants live in PROJECT_STATE.md (referenced, never rewritten). Heavy hygiene is the separate /hygiene skill. Use at end of any non-trivial session before /clear. Missing structure -> `~/.claude/bin/session-init.sh`.
 ---
 
 # Session Handoff — slim derived view
@@ -13,19 +13,29 @@ description: Prepare a fresh session to resume — writes a SLIM SESSION_HANDOFF
 
 ## Step 0: Resolve project
 ```bash
-ROOT=$(git rev-parse --show-toplevel) || { echo "not a git repo"; exit 1; }
-# readlink -f, not echo: the dir may be a symlink, and git refuses paths that live
-# beyond one ("beyond a symbolic link"). SESSION_DOCS_DIR / SESSION_SCRIPTS_DIR name a
-# nested layout (e.g. "sub/docs") when a project keeps one; unset = plain docs/, scripts/.
-pick() { for d in "$@"; do [ -d "$d" ] && { readlink -f "$d"; return 0; }; done; echo "$1"; }
-DOCS=$(pick "$ROOT/docs" ${SESSION_DOCS_DIR:+"$ROOT/$SESSION_DOCS_DIR"})
-SCRIPTS=$(pick "$ROOT/scripts" ${SESSION_SCRIPTS_DIR:+"$ROOT/$SESSION_SCRIPTS_DIR"})
-ls -d "$ROOT"/{SESSION_HANDOFF,CHRONICLE}.md "$DOCS"/{PENDING_LEDGER,PROJECT_STATE,BACKLOG}.md \
-      "$SCRIPTS"/session-snapshot.sh 2>/dev/null
+FACTS="${CLAUDE_HOME:-$HOME/.claude}/bin/session-facts.sh"
+eval "$("$FACTS" --paths)"   # ROOT MAIN BOOKS DOCS SCRIPTS BOOKS_SOURCE BOOKS_WRITE HAVE_*
+[ -n "${ROOT:-}" ] || { echo "layout unresolved: ${SESSION_FACTS_ERROR:-$FACTS missing — reinstall}"; exit 1; }
+echo "BOOKS $BOOKS ($BOOKS_SOURCE, write:$BOOKS_WRITE)"
+echo "handoff=$HAVE_HANDOFF chronicle=$HAVE_CHRONICLE ledger=$HAVE_LEDGER \
+state=$HAVE_STATE backlog=$HAVE_BACKLOG snapshot=$HAVE_SNAPSHOT"
 ```
-- Search order is fixed, not guessed: plain layout first, the configured nested layout second
-- No `CHRONICLE.md` and no `SESSION_HANDOFF.md` -> this project keeps no bookkeeping yet: bootstrap it (below), do not improvise
-- Every other file is OPTIONAL: absent -> its step is skipped with one output line
+- ONE call and it EXITS 0 even when every optional file is missing: absence is the normal,
+  documented case, never a failure. Do NOT probe with `ls` — it exits 2 on the first missing
+  path, which turns a healthy project into "failed to resolve the layout"
+- `--paths` is the single source of truth for the layout: search order, `SESSION_DOCS_DIR` /
+  `SESSION_SCRIPTS_DIR`, symlink resolution and the worktree rule live there, not here
+- Bookkeeping lives under `$BOOKS`, NOT `$ROOT` — in a linked worktree the two differ, and
+  `$DOCS` is already resolved against `$BOOKS`. A worktree checks out TRACKED files only, so
+  books kept local (`.git/info/exclude`) exist in the main worktree alone
+- `BOOKS_WRITE` is the ONLY gate on writing, and it is decided here, once:
+  - `direct` — books are in this worktree; proceed normally
+  - `fallback-untracked` — books are in `$MAIN` and untracked there: write them, say in one
+    line where they went. Nothing is stageable, so Step 9 commits none of them
+  - `fallback-tracked` — books are in `$MAIN` AND tracked there: STOP and ask. Writing dirties
+    a checkout that may be mid-work on another branch. Offer to re-run `/handoff` from `$MAIN`
+- `HAVE_CHRONICLE=no` AND `HAVE_HANDOFF=no` -> this project keeps no bookkeeping yet: bootstrap it (below), do not improvise
+- Every other file is OPTIONAL: `no` -> its step is skipped with one output line
 
 ## Step 1: Facts, one call
 - `$SCRIPTS/session-snapshot.sh` exists -> run it; it is the SSOT of live facts, and you do
@@ -93,7 +103,7 @@ Rewrite the file with ONLY these sections (target 60–90 lines, not 200):
 - Docs-only commit already covered by a feature entry -> skip, no duplicates
 - Reading the tail: grep the entry lines, never `head` the file — it grows past a context window
 ```bash
-grep -E '^- \*\*[0-9]{4}-' "$ROOT/CHRONICLE.md" | head -30 | LC_ALL=C.UTF-8 sed -E 's/^(.{280}).*/\1 …/'
+grep -E '^- \*\*[0-9]{4}-' "$BOOKS/CHRONICLE.md" | head -30 | LC_ALL=C.UTF-8 sed -E 's/^(.{280}).*/\1 …/'
 ```
 
 ## Step 7: Derived artifacts flagged by the snapshot
@@ -118,6 +128,8 @@ Prepared for /clear — the next session starts from this handoff.
 ```
 - Trailers (`Co-Authored-By`, `Claude-Session`) come from the current session prompt — never hardcode here
 - `git status --short` -> confirm clean-in-scope
+- `BOOKS_WRITE=fallback-untracked` -> the books are untracked in `$MAIN` and nothing here is
+  stageable: skip the commit, report where they were written instead of an empty commit
 - Skip auto-commit and ask (A commit / B leave / C revert) ONLY on: a secret/PII in the diff, foreign dirty files, or operator typed `dry-run`
 
 ## Bootstrap — project has no bookkeeping yet
@@ -129,6 +141,9 @@ Prepared for /clear — the next session starts from this handoff.
 - Idempotent: existing files are never touched, only missing ones are created
 - Show the dry-run plan and get a "go" before creating: a project may deliberately keep only two files
 - Refuses outside a git repo — bookkeeping is anchored to the repo root, or the next session cannot find it
+- In a linked worktree (`$MAIN` != `$ROOT`) ask WHERE before creating, the answer is not guessable:
+  tracked bookkeeping belongs here and is committed on this branch; local-only bookkeeping belongs
+  in the main worktree — `session-init.sh --root "$MAIN"` — or it vanishes with the worktree
 
 ## Output (one line)
 - Auto: "Session handoff committed (auto). Working tree clean in scope. Ready for `/clear`."

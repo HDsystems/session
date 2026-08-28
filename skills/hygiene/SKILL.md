@@ -1,6 +1,6 @@
 ---
 name: hygiene
-description: Periodic deep-clean of project bookkeeping — BACKLOG card status-drift audit, documentation-sync with recent commits, PENDING_LEDGER prune of old closed items, and disk reclaim when the project ships a prune script. Works in any git repository: every step activates only when the file or script it needs is present. Run weekly, or when /handoff nags about closed ledger items past the archive window, or when a snapshot flags a ⚠ disk. This is the heavy hygiene deliberately split OUT of the every-session /handoff so the daily handoff stays light.
+description: Periodic deep-clean of project bookkeeping — BACKLOG card status-drift audit, documentation-sync with recent commits, PENDING_LEDGER prune of old closed items, and disk reclaim when the project ships a prune script. Works in any git repository and in a linked worktree: paths resolve through `session-facts.sh --paths`, and every step activates only when the file or script it needs is present. Run weekly, or when /handoff nags about closed ledger items past the archive window, or when a snapshot flags a ⚠ disk. This is the heavy hygiene deliberately split OUT of the every-session /handoff so the daily handoff stays light.
 ---
 
 # Hygiene — periodic deep-clean
@@ -11,13 +11,24 @@ description: Periodic deep-clean of project bookkeeping — BACKLOG card status-
 
 ## Step 0: Resolve project and scope
 ```bash
-ROOT=$(git rev-parse --show-toplevel) || { echo "not a git repo"; exit 1; }
-# readlink -f, not echo: the dir may be a symlink, and git refuses paths that live
-# beyond one ("beyond a symbolic link"). SESSION_DOCS_DIR / SESSION_SCRIPTS_DIR name a
-# nested layout (e.g. "sub/docs") when a project keeps one; unset = plain docs/, scripts/.
-pick() { for d in "$@"; do [ -d "$d" ] && { readlink -f "$d"; return 0; }; done; echo "$1"; }
-DOCS=$(pick "$ROOT/docs" ${SESSION_DOCS_DIR:+"$ROOT/$SESSION_DOCS_DIR"})
-SCRIPTS=$(pick "$ROOT/scripts" ${SESSION_SCRIPTS_DIR:+"$ROOT/$SESSION_SCRIPTS_DIR"})
+FACTS="${CLAUDE_HOME:-$HOME/.claude}/bin/session-facts.sh"
+eval "$("$FACTS" --paths)"   # ROOT MAIN BOOKS DOCS SCRIPTS BOOKS_SOURCE BOOKS_WRITE HAVE_*
+[ -n "${ROOT:-}" ] || { echo "layout unresolved: ${SESSION_FACTS_ERROR:-$FACTS missing — reinstall}"; exit 1; }
+echo "BOOKS $BOOKS ($BOOKS_SOURCE, write:$BOOKS_WRITE)"
+echo "handoff=$HAVE_HANDOFF chronicle=$HAVE_CHRONICLE ledger=$HAVE_LEDGER \
+state=$HAVE_STATE backlog=$HAVE_BACKLOG snapshot=$HAVE_SNAPSHOT"
+```
+- ONE call and it EXITS 0 even when every optional file is missing: absence is the normal,
+  documented case, never a failure. Do NOT probe with `ls` — it exits 2 on the first missing
+  path, which turns a healthy project into "failed to resolve the layout"
+- `--paths` is the single source of truth for the layout: search order, `SESSION_DOCS_DIR` /
+  `SESSION_SCRIPTS_DIR`, symlink resolution and the worktree rule live there, not here
+- Bookkeeping lives under `$BOOKS`, NOT `$ROOT` — in a linked worktree the two differ, and
+  `$DOCS` is already resolved against `$BOOKS`. A worktree checks out TRACKED files only, so
+  books kept local (`.git/info/exclude`) exist in the main worktree alone
+- `BOOKS_WRITE=fallback-tracked` -> books are tracked in `$MAIN`: do NOT edit them from here,
+  ask the operator to re-run `/hygiene` from `$MAIN`
+```bash
 git -C "$ROOT" log --since='7 days ago' --oneline
 git -C "$ROOT" diff --stat "$(git -C "$ROOT" rev-list -1 --before='7 days ago' HEAD)" HEAD
 ```
